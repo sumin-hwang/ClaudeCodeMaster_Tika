@@ -1,0 +1,21 @@
+# dependencies
+node_modules
+
+# next.js
+.next
+out
+build
+
+# env
+.env*.local
+.env.test
+
+# vercel
+.vercel
+
+# testing / coverage
+coverage
+
+# misc
+*.tsbuildinfo
+.DS_Store
