@@ -128,12 +128,12 @@ export const tickets = pgTable(
     position: integer('position').notNull().default(1),
     plannedStartDate: date('planned_start_date', { mode: 'string' }),
     dueDate: date('due_date', { mode: 'string' }),
-    startedAt: timestamp('started_at', { mode: 'date' }),
-    completedAt: timestamp('completed_at', { mode: 'date' }),
-    createdAt: timestamp('created_at', { mode: 'date' })
+    startedAt: timestamp('started_at', { mode: 'date', withTimezone: true }),
+    completedAt: timestamp('completed_at', { mode: 'date', withTimezone: true }),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp('updated_at', { mode: 'date' })
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),
@@ -145,6 +145,8 @@ export const tickets = pgTable(
   ]
 );
 ```
+
+> **`withTimezone: true` 필수**: Postgres 세션 타임존이 UTC가 아니면(예: `Asia/Seoul`), `timestamp`(타임존 없음) 컬럼은 `defaultNow()`/`$onUpdate` 값이 세션 타임존만큼 어긋나 저장된다. 반드시 `timestamp with time zone`으로 선언해 이 문제를 방지한다 (TC-API-004-09 검증 중 실제로 9시간 오차가 발견되어 수정됨).
 
 ---
 

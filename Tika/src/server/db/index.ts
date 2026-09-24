@@ -1,5 +1,5 @@
-import { db } from './client';
-import { tickets } from './schema';
+import { db } from './client.ts';
+import { tickets } from './schema.ts';
 
 export { db, tickets };
 

@@ -1,13 +1,16 @@
 /**
  * @jest-environment node
  *
- * TC-API-001: 티켓 생성 (FR-001)
- * 참고: docs/API_SPEC.md "1. POST /api/tickets", docs/TEST_CASES.md "TC-API-001"
- *
- * 아직 app/api/tickets/route.ts가 구현되지 않았으므로 이 테스트는 전부 실패한다 (RED).
+ * TC-API-001: 티켓 생성 (FR-001), TC-API-002: 보드 조회 (FR-002), TC-API-008: 오버듀 판정 (FR-008)
+ * 참고: docs/API_SPEC.md "1. POST /api/tickets" / "2. GET /api/tickets", docs/TEST_CASES.md
  */
-import { POST } from '../../app/api/tickets/route';
-import { resetTickets } from '@/server/db';
+import { GET, POST } from '../../app/api/tickets/route';
+import { db, resetTickets, tickets } from '@/server/db';
+
+type BoardResponse = {
+  board: Record<'BACKLOG' | 'TODO' | 'IN_PROGRESS' | 'DONE', Array<Record<string, unknown>>>;
+  total: number;
+};
 
 const createRequest = (body: unknown) =>
   new Request('http://localhost/api/tickets', {
@@ -43,12 +46,19 @@ describe('POST /api/tickets', () => {
   });
 
   test('TC-API-001-02: 전체 필드 입력 시 입력값이 그대로 저장·반환된다', async () => {
+    // dueDate는 실행 시점 기준 항상 미래여야 하므로 고정 날짜 대신 "내일"을 동적으로 계산한다.
+    // (fake timers는 postgres 드라이버의 실제 소켓/타이머와 충돌해 이후 테스트의 beforeEach를
+    //  타임아웃시키므로 사용하지 않는다.)
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dueDate = tomorrow.toISOString().split('T')[0];
+
     const input = {
       title: 'API 설계 문서 작성',
       description: 'REST API 엔드포인트와 요청/응답 형식을 정의한다',
       priority: 'HIGH',
       plannedStartDate: '2026-02-10',
-      dueDate: '2026-09-20',
+      dueDate,
     };
 
     const response = await POST(createRequest(input));
@@ -150,5 +160,132 @@ describe('POST /api/tickets', () => {
     // Then
     expect(response.status).toBe(201);
     expect(data.position).toBe(-1024);
+  });
+});
+
+describe('GET /api/tickets', () => {
+  test('TC-API-002-01: 빈 보드', async () => {
+    const response = await GET();
+    const data = (await response.json()) as BoardResponse;
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      board: { BACKLOG: [], TODO: [], IN_PROGRESS: [], DONE: [] },
+      total: 0,
+    });
+  });
+
+  test('TC-API-002-02: 칼럼별 그룹화', async () => {
+    await db.insert(tickets).values([
+      { title: 'backlog 티켓', status: 'BACKLOG', position: 0 },
+      { title: 'todo 티켓', status: 'TODO', position: 0 },
+      { title: 'in progress 티켓', status: 'IN_PROGRESS', position: 0 },
+      { title: 'done 티켓', status: 'DONE', position: 0, completedAt: new Date() },
+    ]);
+
+    const response = await GET();
+    const data = (await response.json()) as BoardResponse;
+
+    expect(data.board.BACKLOG).toHaveLength(1);
+    expect(data.board.TODO).toHaveLength(1);
+    expect(data.board.IN_PROGRESS).toHaveLength(1);
+    expect(data.board.DONE).toHaveLength(1);
+  });
+
+  test('TC-API-002-03: 칼럼 내 정렬', async () => {
+    await db.insert(tickets).values([
+      { title: 'c', status: 'TODO', position: 2048 },
+      { title: 'a', status: 'TODO', position: 0 },
+      { title: 'b', status: 'TODO', position: 1024 },
+    ]);
+
+    const response = await GET();
+    const data = (await response.json()) as BoardResponse;
+
+    expect(data.board.TODO.map((t) => t.title)).toEqual(['a', 'b', 'c']);
+  });
+
+  test('TC-API-002-04: 파생 필드 포함', async () => {
+    await db.insert(tickets).values({ title: '파생필드', status: 'BACKLOG', position: 0 });
+
+    const response = await GET();
+    const data = (await response.json()) as BoardResponse;
+
+    expect(data.board.BACKLOG[0]).toHaveProperty('isOverdue');
+  });
+
+  test('TC-API-002-05: Done 24시간 필터', async () => {
+    const now = Date.now();
+    await db.insert(tickets).values([
+      { title: '최근완료', status: 'DONE', position: 0, completedAt: new Date(now - 23 * 60 * 60 * 1000) },
+      { title: '오래된완료', status: 'DONE', position: 1024, completedAt: new Date(now - 25 * 60 * 60 * 1000) },
+    ]);
+
+    const response = await GET();
+    const data = (await response.json()) as BoardResponse;
+
+    expect(data.board.DONE).toHaveLength(1);
+    expect(data.board.DONE[0].title).toBe('최근완료');
+  });
+});
+
+describe('GET /api/tickets — isOverdue (TC-API-008)', () => {
+  test('TC-API-008-01: 기한 초과', async () => {
+    await db.insert(tickets).values({ title: 't', status: 'TODO', position: 0, dueDate: '2020-01-01' });
+
+    const response = await GET();
+    const data = (await response.json()) as BoardResponse;
+
+    expect(data.board.TODO[0].isOverdue).toBe(true);
+  });
+
+  test('TC-API-008-02: 기한 이전', async () => {
+    const future = new Date();
+    future.setDate(future.getDate() + 30);
+    await db.insert(tickets).values({
+      title: 't',
+      status: 'TODO',
+      position: 0,
+      dueDate: future.toISOString().split('T')[0],
+    });
+
+    const response = await GET();
+    const data = (await response.json()) as BoardResponse;
+
+    expect(data.board.TODO[0].isOverdue).toBe(false);
+  });
+
+  test('TC-API-008-03: dueDate 없음', async () => {
+    await db.insert(tickets).values({ title: 't', status: 'TODO', position: 0 });
+
+    const response = await GET();
+    const data = (await response.json()) as BoardResponse;
+
+    expect(data.board.TODO[0].isOverdue).toBe(false);
+  });
+
+  test('TC-API-008-04: 완료된 티켓', async () => {
+    await db.insert(tickets).values({
+      title: 't',
+      status: 'DONE',
+      position: 0,
+      dueDate: '2020-01-01',
+      completedAt: new Date(),
+    });
+
+    const response = await GET();
+    const data = (await response.json()) as BoardResponse;
+
+    expect(data.board.DONE[0].isOverdue).toBe(false);
+  });
+
+  test('TC-API-008-05: 오늘이 마감일', async () => {
+    const today = new Date().toISOString().split('T')[0];
+    await db.insert(tickets).values({ title: 't', status: 'TODO', position: 0, dueDate: today });
+
+    const response = await GET();
+    const data = (await response.json()) as BoardResponse;
+
+    expect(data.board.TODO[0].isOverdue).toBe(false);
   });
 });

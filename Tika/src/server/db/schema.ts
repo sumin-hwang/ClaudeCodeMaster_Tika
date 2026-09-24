@@ -20,12 +20,12 @@ export const tickets = pgTable(
     position: integer('position').notNull().default(1),
     plannedStartDate: date('planned_start_date', { mode: 'string' }),
     dueDate: date('due_date', { mode: 'string' }),
-    startedAt: timestamp('started_at', { mode: 'date' }),
-    completedAt: timestamp('completed_at', { mode: 'date' }),
-    createdAt: timestamp('created_at', { mode: 'date' })
+    startedAt: timestamp('started_at', { mode: 'date', withTimezone: true }),
+    completedAt: timestamp('completed_at', { mode: 'date', withTimezone: true }),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp('updated_at', { mode: 'date' })
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),

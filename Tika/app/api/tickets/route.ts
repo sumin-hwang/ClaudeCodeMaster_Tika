@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createTicketSchema } from '@/shared/validations/ticket';
-import { createTicket } from '@/server/services/ticketService';
+import { createTicket, getBoard } from '@/server/services/ticketService';
+
+export async function GET() {
+  const board = await getBoard();
+  return NextResponse.json(board);
+}
 
 export async function POST(request: Request) {
   const body = await request.json();
