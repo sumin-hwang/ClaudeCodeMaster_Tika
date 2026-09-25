@@ -11,11 +11,150 @@
  */
 
 import { useState } from 'react';
+import { DndContext } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Button } from '@/client/components/Button';
 import { PriorityBadge } from '@/client/components/PriorityBadge';
 import { DueDateBadge } from '@/client/components/DueDateBadge';
 import { Modal } from '@/client/components/Modal';
 import { ConfirmDialog } from '@/client/components/ConfirmDialog';
+import { TicketCard } from '@/client/components/TicketCard';
+import { Board } from '@/client/components/Board';
+import type { BoardData, TicketWithMeta } from '@/shared/types';
+
+const MOCK_TICKETS: TicketWithMeta[] = [
+  {
+    id: 1,
+    title: '일반 티켓 예시',
+    description: null,
+    status: 'TODO',
+    priority: 'MEDIUM',
+    position: 0,
+    plannedStartDate: null,
+    dueDate: '2026-10-01',
+    startedAt: null,
+    completedAt: null,
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    isOverdue: false,
+  },
+  {
+    id: 2,
+    title: '기한이 지난, 그리고 아주 아주 긴 제목이라 말줄임이 필요한 티켓 예시',
+    description: null,
+    status: 'IN_PROGRESS',
+    priority: 'HIGH',
+    position: 0,
+    plannedStartDate: null,
+    dueDate: '2026-09-01',
+    startedAt: '2026-09-01T00:00:00.000Z',
+    completedAt: null,
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    isOverdue: true,
+  },
+  {
+    id: 3,
+    title: '완료된 티켓 예시',
+    description: null,
+    status: 'DONE',
+    priority: 'LOW',
+    position: 0,
+    plannedStartDate: null,
+    dueDate: null,
+    startedAt: '2026-08-01T00:00:00.000Z',
+    completedAt: '2026-09-01T00:00:00.000Z',
+    createdAt: '2026-08-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    isOverdue: false,
+  },
+];
+
+function Phase3Section() {
+  const [lastClicked, setLastClicked] = useState<string | null>(null);
+
+  return (
+    <section aria-labelledby="phase-3-heading" className="rounded-panel border border-border bg-surface p-6">
+      <h2 id="phase-3-heading" className="text-lg font-semibold text-text">
+        Phase 3 — TicketCard
+      </h2>
+      {lastClicked && <p className="mt-1 text-xs text-text-muted">마지막 클릭: {lastClicked}</p>}
+      <div className="mt-4 flex max-w-xs flex-col gap-3">
+        <DndContext>
+          <SortableContext items={MOCK_TICKETS.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+            {MOCK_TICKETS.map((ticket) => (
+              <TicketCard key={ticket.id} ticket={ticket} onClick={(t) => setLastClicked(t.title)} />
+            ))}
+          </SortableContext>
+        </DndContext>
+      </div>
+    </section>
+  );
+}
+
+const makeMockTicket = (overrides: Partial<TicketWithMeta>): TicketWithMeta => ({
+  id: 0,
+  title: '티켓',
+  description: null,
+  status: 'BACKLOG',
+  priority: 'MEDIUM',
+  position: 0,
+  plannedStartDate: null,
+  dueDate: null,
+  startedAt: null,
+  completedAt: null,
+  createdAt: '2026-09-01T00:00:00.000Z',
+  updatedAt: '2026-09-01T00:00:00.000Z',
+  isOverdue: false,
+  ...overrides,
+});
+
+const MOCK_BOARD: BoardData['board'] = {
+  BACKLOG: [
+    makeMockTicket({ id: 101, title: '백로그 티켓 (HIGH)', status: 'BACKLOG', priority: 'HIGH' }),
+    makeMockTicket({ id: 102, title: '백로그 티켓 B', status: 'BACKLOG', priority: 'LOW' }),
+  ],
+  TODO: [
+    makeMockTicket({
+      id: 103,
+      title: '할 일 티켓 (기한 초과)',
+      status: 'TODO',
+      priority: 'HIGH',
+      dueDate: '2026-09-01',
+      isOverdue: true,
+    }),
+    makeMockTicket({ id: 104, title: '할 일 티켓 B', status: 'TODO', dueDate: '2026-10-05' }),
+    makeMockTicket({ id: 105, title: '할 일 티켓 C', status: 'TODO', priority: 'LOW' }),
+  ],
+  IN_PROGRESS: [
+    makeMockTicket({
+      id: 106,
+      title: '진행 중인 티켓',
+      status: 'IN_PROGRESS',
+      priority: 'MEDIUM',
+      dueDate: '2026-10-10',
+    }),
+  ],
+  DONE: [makeMockTicket({ id: 107, title: '완료된 티켓', status: 'DONE', priority: 'LOW' })],
+};
+
+function Phase4Section() {
+  const [lastClicked, setLastClicked] = useState<string | null>(null);
+
+  return (
+    <section aria-labelledby="phase-4-heading" className="rounded-panel border border-border bg-surface p-6">
+      <h2 id="phase-4-heading" className="text-lg font-semibold text-text">
+        Phase 4 — ColumnHeader / Column / Board
+      </h2>
+      {lastClicked && <p className="mt-1 text-xs text-text-muted">마지막 클릭: {lastClicked}</p>}
+      <div className="mt-4">
+        <DndContext>
+          <Board board={MOCK_BOARD} onCardClick={(t) => setLastClicked(t.title)} />
+        </DndContext>
+      </div>
+    </section>
+  );
+}
 
 function Phase1Section() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -128,12 +267,8 @@ export default function PreviewPage() {
 
       <div className="mt-8 flex flex-col gap-6">
         <Phase1Section />
-        <PreviewSection phaseId="phase-3" title="Phase 3 — TicketCard" todo="FE-T301 TicketCard" />
-        <PreviewSection
-          phaseId="phase-4"
-          title="Phase 4 — 컬럼/사이드바 컨테이너"
-          todo="FE-T401 BoardColumn, FE-T402 BacklogSidebar"
-        />
+        <Phase3Section />
+        <Phase4Section />
         <PreviewSection
           phaseId="phase-5"
           title="Phase 5 — 폼/모달"

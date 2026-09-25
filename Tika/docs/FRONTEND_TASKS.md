@@ -37,14 +37,14 @@ graph TD
   PriorityBadge --> TicketCard
   DueDateBadge --> TicketCard
 
-  TicketCard --> BoardColumn
-  TicketCard --> BacklogSidebar
+  TicketCard --> Column
+  ColumnHeader --> Column
+  Column --> Board
 
   useTicketForm --> TicketForm
   TicketForm --> TicketModal
 
-  BoardColumn --> BoardPage
-  BacklogSidebar --> BoardPage
+  Board --> BoardPage
   TicketModal --> BoardPage
   ConfirmDialog --> BoardPage
   useBoardData --> BoardPage
@@ -98,22 +98,17 @@ graph TD
 
 ### Phase 2 — 인프라 트랙: API 클라이언트 + 폼 훅 [P] (Phase 1과 병렬 가능, Phase 2 내부도 useTicketForm은 독립)
 
-#### FE-T201 [P] ticketApi.ts
-- **파일**: `src/client/api/ticketApi.ts`
+#### FE-T201 [x] [P] ticketApi.ts
+- **파일**: `src/client/api/ticketApi.ts`, 테스트: `__tests__/client/api/ticketApi.test.ts`
 - **의존성**: `FE-T000`(타입)
 - **역할**: `API_SPEC.md`의 7개 엔드포인트를 얇게 감싼 `fetch` 래퍼 함수 7개 (`getBoard`, `getTicket`, `createTicket`, `updateTicket`, `completeTicket`, `deleteTicket`, `reorderTicket`). 컴포넌트/훅은 이 모듈을 통해서만 API 호출(CLAUDE.md 컨벤션).
-- **TDD 체크리스트**:
-  - [ ] Red: 전용 TC ID 없음(TEST_CASES.md는 `useBoardData`를 통한 간접 테스트를 전제) — `fetch`를 mock하여 각 함수가 올바른 method/URL/body로 호출하는지 검증하는 테스트 신규 작성 (제안: `TC-COMP-008-0N`)
-  - [ ] Green: 최소 구현 (에러 응답 시 `{error:{code,message}}` 형식을 그대로 throw)
-  - [ ] Refactor: 공통 fetch 헬퍼로 중복 제거
+- **완료** (2026-09-25) — 9개 테스트(7개 함수의 method/URL/body 검증, 에러 응답 시 `error` 객체 그대로 throw, 공통 Content-Type 헤더) 전부 통과. 공통 `request<T>()` 헬퍼로 처음부터 중복 없이 구현돼 별도 Refactor 불필요. 부수적으로 `src/shared/types/index.ts`에 누락돼 있던 `ReorderTicketInput` 재노출 추가.
+- 테스트 위치는 기존 `__tests__/api/`(서버 라우트, 실DB 연동)와 구분하기 위해 `__tests__/client/api/`로 새로 분리(`src/client/` 미러링).
 
-#### FE-T202 [P] useTicketForm
-- **파일**: `src/client/hooks/useTicketForm.ts`
+#### FE-T202 [x] [P] useTicketForm
+- **파일**: `src/client/hooks/useTicketForm.ts`, 테스트: `__tests__/client/hooks/useTicketForm.test.ts`
 - **의존성**: `src/shared/validations`의 `createTicketSchema`/`updateTicketSchema` (이미 구현됨)
-- **TDD 체크리스트**:
-  - [ ] Red: 이 훅은 `TicketForm`을 통해 `TC-COMP-004`(생성)/`TC-COMP-005`(수정) 시나리오로 간접 검증되는 것이 TEST_CASES.md의 기본 전제. 훅 자체 단위 테스트를 원하면 `renderHook`으로 `TC-COMP-004-04`(과거 종료예정일 → 제출 차단, 에러 메시지 노출), `TC-COMP-004-06`(제목 공백 → 제출 차단) 로직만 선행 검증 가능(선택)
-  - [ ] Green: Zod `safeParse` 결과를 `errors`에 매핑하는 최소 구현
-  - [ ] Refactor: 필드별 에러 매핑 로직 정리
+- **완료** (2026-09-25) — 6개 테스트(초기값 설정, `handleChange` 갱신, `TC-COMP-004-06` 제목 공백 차단, `TC-COMP-004-04` 과거 종료예정일 차단, 유효 제출 시 `onSubmit` 호출+`errors` 초기화, 제출 중 `isSubmitting` true→false 전이) 전부 통과.
 
 > `useBoardData`, `useDragAndDrop`은 Phase 2가 아니라 **Phase 5**에 배치했다 — `useBoardData`는 `ticketApi.ts`(FE-T201) 완료가 선행 조건이고, `useDragAndDrop`은 `useBoardData.moveTicket`의 시그니처가 먼저 확정돼야 하기 때문이다. 일정상 Phase 2 트랙과 동시에 시작하고 싶다면 `useBoardData`부터가 아니라 `ticketApi.ts` 목업(스텁)으로 시작해도 되지만, 아래 표에서는 실제 의존성 순서를 그대로 반영했다.
 
@@ -123,14 +118,13 @@ graph TD
 
 Phase 1의 `PriorityBadge`, `DueDateBadge` 완료 후 시작.
 
-#### FE-T301 TicketCard
-- **파일**: `src/client/components/TicketCard.tsx`
+#### FE-T301 [x] TicketCard
+- **파일**: `src/client/components/TicketCard.tsx`, 테스트: `__tests__/components/TicketCard.test.tsx`
 - **의존성**: `FE-T101`(PriorityBadge), `FE-T102`(DueDateBadge)
-- **TDD 체크리스트**:
-  - [ ] Red: `TC-COMP-001-01`(오버듀 표시), `TC-COMP-001-02`(정상 티켓은 경고색 미적용), `TC-COMP-001-03`(오버듀 표시가 우선순위 뱃지와 다른 클래스/속성) — `DueDateBadge`로 구현이 바뀌었으므로 "렌더 여부" 대신 "색상 클래스 적용 여부"로 검증
-  - [ ] Green: `dueDate`가 있을 때만 `DueDateBadge`에 `isOverdue` 전달 + `PriorityBadge` 배치, `role="button"`/`tabIndex={0}`/`aria-label` 포함 최소 구현
-  - [ ] Refactor: 제목 truncate, 일정 요약 표시 로직(둘 다 null이면 미표시) 정리 — 테스트 유지
-  - [ ] (드래그 가능 요소 등록은 `@dnd-kit`의 `useSortable`을 쓰지만, 실제 드래그 동작 검증은 Phase 6의 `TC-INT-001`에서 통합 테스트로 수행 — 이 Phase에서는 정적 렌더링만 검증)
+- **변경 사항**: `PriorityBadge`/`DueDateBadge`의 실제 구현이 `src/client/components/Badge.tsx`로 통합됨(기존 `PriorityBadge.tsx`/`DueDateBadge.tsx`는 `Badge.tsx`를 재노출하는 얇은 파일로 유지 — 기존 테스트 파일들의 import 경로를 건드리지 않기 위함). 오버듀 스타일은 색상 클래스 대신 카드 루트의 `data-overdue` 속성 + `globals.css`의 `.ticket-card[data-overdue="true"]` 선택자로 제어. 완료 상태는 `.ticket-card--done` 클래스.
+- **완료** (2026-09-25) — 자체 정의한 C001-1~7(TEST_CASES.md TC-COMP-001을 구체화) 7개 테스트 전부 통과: 기본 렌더링, `data-overdue` 속성, `ticket-card--done` 클래스, `dueDate=null` 시 날짜 영역 숨김, 클릭 시 `onClick(ticket)` 호출, 제목 `truncate` 클래스, `PriorityBadge`의 `data-priority` 속성.
+  - [x] Red → Green → Refactor(리팩토링 불필요할 만큼 최소 구현) 완료
+  - (드래그 가능 요소 등록은 `@dnd-kit`의 `useSortable`을 쓰지만, 테스트에서는 mock 처리. 실제 드래그 동작 검증은 Phase 6의 `TC-INT-001`에서 통합 테스트로 수행)
 
 ---
 
@@ -138,21 +132,24 @@ Phase 1의 `PriorityBadge`, `DueDateBadge` 완료 후 시작.
 
 Phase 3의 `TicketCard` 완료 후 시작.
 
-#### FE-T401 [P] BoardColumn
-- **파일**: `src/client/components/BoardColumn.tsx`
-- **의존성**: `FE-T301`(TicketCard)
-- **TDD 체크리스트**:
-  - [ ] Red: `TC-COMP-002-01`(헤더에 title+카드 수), `TC-COMP-002-02`(position 오름차순 정렬 렌더), `TC-COMP-002-03`(빈 컬럼 시 카드 수 "0")
-  - [ ] Green: 3개 테스트 통과 최소 구현 (`useDroppable({id: status})` 등록 포함)
-  - [ ] Refactor: 정렬은 이미 정렬된 데이터를 받는다는 전제이므로 불필요한 재정렬 로직 제거
+**변경 사항 (2026-09-25)**: 원래 계획한 `BoardColumn`(TODO/IN_PROGRESS/DONE 전용) + `BacklogSidebar`(BACKLOG 전용, 별도 컴포넌트) 2분할 대신, `status: TicketStatus`(BACKLOG 포함 4개 전부)를 받는 범용 `Column` 하나로 통합하고, 헤더 표시 부분을 `ColumnHeader`로 더 쪼갠 뒤, 이 둘을 조합해 "Backlog 사이드바 + 3컬럼 메인 레이아웃"을 구성하는 `Board`(레이아웃 전용, 데이터 페칭 없음 — `FE-T601 BoardPage`가 나중에 이 위에서 `useBoardData` 연동)까지 함께 만드는 구조로 진행함. `BacklogSidebar`의 "+ 새 티켓" 버튼(`onAddClick`)은 아직 미구현 — `Board`/`BoardPage` 완성 단계에서 추가 예정.
 
-#### FE-T402 [P] BacklogSidebar
-- **파일**: `src/client/components/BacklogSidebar.tsx`
-- **의존성**: `FE-T301`(TicketCard)
-- **TDD 체크리스트**:
-  - [ ] Red: `TC-COMP-003-01`("Backlog" 라벨 + 카드 수), `TC-COMP-003-02`("+ 새 티켓" 클릭 → `onAddClick` 1회)
-  - [ ] Green: 2개 테스트 통과 최소 구현 (`useDroppable({id: 'BACKLOG'})` 등록 포함)
-  - [ ] Refactor: `BoardColumn`과 레이아웃 구조가 유사하면 공통 스타일만 추출(로직 공유는 강제하지 않음 — COMPONENT_SPEC.md가 둘을 별개 컴포넌트로 명시)
+#### FE-T401a [x] ColumnHeader (신규 분리)
+- **파일**: `src/client/components/ColumnHeader.tsx`, 테스트: `__tests__/components/ColumnHeader.test.tsx`
+- **Props**: `{ title: string; count: number }`
+- **완료** (2026-09-25) — 4개 테스트(title 표시, count 표시, count=0 표시, heading 역할) 전부 통과.
+
+#### FE-T401 [x] Column (구 BoardColumn — BACKLOG 포함 4개 status 전부 지원하도록 범위 확장)
+- **파일**: `src/client/components/Column.tsx`, 테스트: `__tests__/components/Column.test.tsx`
+- **Props**: `{ status: TicketStatus; title: string; tickets: TicketWithMeta[]; onCardClick: (ticket) => void }`
+- **의존성**: `FE-T301`(TicketCard), `FE-T401a`(ColumnHeader)
+- **완료** (2026-09-25) — 8개 테스트(헤더 표시, position 순서 렌더, 빈 컬럼 카드 수 "0", 빈 컬럼 안내 문구 표시/미표시, TicketCard 개수 일치, 클릭 전파, `useDroppable({id: status})` 등록) 전부 통과. `SortableContext`(내부 재정렬용)로 감싸는 구조.
+
+#### FE-T402 [x] Board (신규 — BacklogSidebar를 흡수한 레이아웃 컴포넌트)
+- **파일**: `src/client/components/Board.tsx`, 테스트: `__tests__/components/Board.test.tsx`
+- **Props**: `{ board: BoardData['board']; onCardClick: (ticket) => void }`
+- **의존성**: `FE-T401`(Column)
+- **완료** (2026-09-25) — 4개 테스트(Backlog 사이드바 렌더, TODO/In Progress/Done 3컬럼 렌더, status별 티켓 격리, 클릭 전파) 전부 통과. `Column`을 4번(BACKLOG 1 + TODO/IN_PROGRESS/DONE 3) 재사용.
 
 ---
 
@@ -200,7 +197,7 @@ Phase 4, Phase 5 전부 완료 후 시작. 이 프로젝트에서 유일하게 �
 
 #### FE-T601 BoardPage
 - **파일**: `src/client/components/BoardPage.tsx`
-- **의존성**: `FE-T401`(BoardColumn), `FE-T402`(BacklogSidebar), `FE-T502`(TicketModal), `FE-T103`(ConfirmDialog), `FE-T503`(useBoardData), `FE-T504`(useDragAndDrop)
+- **의존성**: `FE-T402`(Board), `FE-T502`(TicketModal), `FE-T103`(ConfirmDialog), `FE-T503`(useBoardData), `FE-T504`(useDragAndDrop)
 - **TDD 체크리스트**:
   - [ ] Red: `TC-INT-001`(드래그앤드롭 → 완료 처리, US-005/US-006), `TC-INT-002`(완료 처리 → 삭제, US-006/US-008), `TC-COMP-005-03`(수정 성공 후 보드에 반영)
   - [ ] Green: 3개 테스트 통과 최소 구현 — `activeModal`/`confirmDeleteId` 로컬 상태, 하위 컴포넌트에 핸들러 배선
@@ -223,11 +220,12 @@ Phase 4, Phase 5 전부 완료 후 시작. 이 프로젝트에서 유일하게 �
 - [x] FE-T102 [P] DueDateBadge (구 OverdueBadge)
 - [x] FE-T104 [P] Modal (신규 추가)
 - [x] FE-T103 [P] ConfirmDialog (FE-T104, FE-T100 이후)
-- [ ] FE-T201 [P] ticketApi.ts
-- [ ] FE-T202 [P] useTicketForm
-- [ ] FE-T301 TicketCard (FE-T101, FE-T102 이후)
-- [ ] FE-T401 [P] BoardColumn (FE-T301 이후)
-- [ ] FE-T402 [P] BacklogSidebar (FE-T301 이후)
+- [x] FE-T201 [P] ticketApi.ts
+- [x] FE-T202 [P] useTicketForm
+- [x] FE-T301 TicketCard (FE-T101, FE-T102 이후)
+- [x] FE-T401a ColumnHeader (신규 분리)
+- [x] FE-T401 Column (구 BoardColumn, BACKLOG 포함으로 범위 확장, FE-T301/FE-T401a 이후)
+- [x] FE-T402 Board (신규, BacklogSidebar 흡수, FE-T401 이후)
 - [ ] FE-T501 [P] TicketForm (FE-T202 이후)
 - [ ] FE-T502 [P] TicketModal (FE-T501 이후)
 - [ ] FE-T503 [P] useBoardData (FE-T201 이후)

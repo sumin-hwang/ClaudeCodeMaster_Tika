@@ -1,6 +1,6 @@
 // FE에서 사용하는 핵심 타입
 
-export type { CreateTicketInput, UpdateTicketInput } from '@/shared/validations/ticket';
+export type { CreateTicketInput, UpdateTicketInput, ReorderTicketInput } from '@/shared/validations/ticket';
 
 export const TICKET_STATUS = {
     BACKLOG : 'BACKLOG', 
