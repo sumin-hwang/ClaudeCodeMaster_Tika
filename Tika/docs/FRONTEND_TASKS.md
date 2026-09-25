@@ -13,9 +13,9 @@
 
 | ID | 파일 | 작업 | 의존성 |
 |---|---|---|---|
-| FE-T000 | `src/shared/types/index.ts` | `Ticket`(DB 티켓 전체 필드), `TicketStatus`, `TicketPriority` 타입 정의 추가. `CreateTicketInput`/`UpdateTicketInput`은 새로 만들지 말고 `src/shared/validations/ticket.ts`의 `z.infer` 타입을 재노출(`export type { CreateTicketInput, UpdateTicketInput }`) | 없음 |
+| FE-T000 [x] | `src/shared/types/index.ts` | `Ticket`(DB 티켓 전체 필드), `TicketStatus`, `TicketPriority` 타입 정의 추가. `CreateTicketInput`/`UpdateTicketInput`은 새로 만들지 말고 `src/shared/validations/ticket.ts`의 `z.infer` 타입을 재노출(`export type { CreateTicketInput, UpdateTicketInput }`) | 없음 |
 
-**검증**: 런타임 테스트 대상이 아닌 순수 타입 작업이므로 Red/Green 사이클 대신 `npx tsc --noEmit`으로 에러 0건 확인. 이후 모든 Phase의 "Green" 단계 검증에 이 명령이 공통으로 포함된다.
+**검증**: 런타임 테스트 대상이 아닌 순수 타입 작업이므로 Red/Green 사이클 대신 `npx tsc --noEmit`으로 에러 0건 확인. 이후 모든 Phase의 "Green" 단계 검증에 이 명령이 공통으로 포함된다. **완료** (2026-09-25).
 
 ---
 
@@ -25,15 +25,17 @@
 graph TD
   types["FE-T000<br/>shared/types"] --> api["ticketApi.ts"]
   types --> PriorityBadge
-  types --> OverdueBadge
-  types --> ConfirmDialog
+  types --> DueDateBadge
   types --> useTicketForm
+
+  Modal --> ConfirmDialog
+  Button --> ConfirmDialog
 
   api --> useBoardData
   useBoardData --> useDragAndDrop
 
   PriorityBadge --> TicketCard
-  OverdueBadge --> TicketCard
+  DueDateBadge --> TicketCard
 
   TicketCard --> BoardColumn
   TicketCard --> BacklogSidebar
@@ -59,37 +61,38 @@ graph TD
 
 ### Phase 1 — 말단 순수 컴포넌트 [P] (서로 독립, 병렬 가능)
 
-다른 client 컴포넌트에 의존하지 않는 3개. `FE-T000` 완료 후 셋 다 동시에 시작 가능.
+다른 client 컴포넌트에 의존하지 않는 것들. `FE-T000` 완료 후 시작 가능. `Button`, `Modal`은 원래 이 문서에 없던 항목이었으나 실제 구현 중 필요해져 Phase 1에 추가됨(둘 다 하위 의존성 없음).
 
-#### FE-T101 [P] PriorityBadge
-- **파일**: `src/client/components/PriorityBadge.tsx`
+#### FE-T100 [x] [P] Button
+- **파일**: `src/client/components/Button.tsx`, 테스트: `__tests__/components/Button.test.tsx`
+- **Props**: `variant`('primary'|'secondary'|'danger'|'ghost', 기본 primary), `size`('sm'|'md'|'lg', 기본 md), `isLoading`, `onClick`, `children`
+- **완료** (2026-09-25) — 12개 테스트 전부 통과. `ConfirmDialog`가 이 컴포넌트를 재사용.
+
+#### FE-T101 [x] [P] PriorityBadge
+- **파일**: `src/client/components/PriorityBadge.tsx`, 테스트: `__tests__/components/PriorityBadge.test.tsx`
 - **Props**: `{ priority: TicketPriority }`
 - **의존성**: `FE-T000`(타입)만
-- **TDD 체크리스트**:
-  - [ ] Red: `TEST_CASES.md`에 `PriorityBadge` 전용 TC ID가 없음 — REQUIREMENTS.md 6장 표(LOW=회색, MEDIUM=파란색, HIGH=빨간색) 기준으로 아래 3개 테스트를 새로 작성 (제안 ID `TC-COMP-007`, 필요 시 TEST_CASES.md에 역보강 권장)
-    - `TC-COMP-007-01`: `priority="LOW"` → 회색 계열 클래스/텍스트 렌더
-    - `TC-COMP-007-02`: `priority="MEDIUM"` → 파란색 계열
-    - `TC-COMP-007-03`: `priority="HIGH"` → 빨간색 계열
-  - [ ] Green: 위 3개 테스트를 통과하는 최소 구현 (`globals.css`의 `--color-priority-*-bg/text` 토큰 사용)
-  - [ ] Refactor: 색상 매핑을 `const PRIORITY_STYLE = {...}` 객체로 정리(테스트는 계속 통과 유지)
+- **완료** (2026-09-25) — `TC-COMP-007-01~03`(LOW/MEDIUM/HIGH 색상 클래스) 3개 테스트 전부 통과. 라벨은 "낮음"/"보통"/"높음"으로 표시.
 
-#### FE-T102 [P] OverdueBadge
-- **파일**: `src/client/components/OverdueBadge.tsx`
-- **Props**: 없음
-- **의존성**: 없음 (표시 여부는 부모 판단이므로 조건부 렌더 로직도 없음)
-- **TDD 체크리스트**:
-  - [ ] Red: `TC-COMP-001-01`(렌더 시 문서에 오버듀 뱃지 존재) — 단, 이 TC는 실제로 `TicketCard`에 조건부 렌더된 상태를 검증하므로 `OverdueBadge` 자체는 "항상 렌더되면 항상 보인다"는 스냅샷 수준 테스트만 별도 작성
-  - [ ] Green: 최소 구현 (`--color-overdue-bg/text` 토큰 사용)
-  - [ ] Refactor: 불필요한 wrapper 제거
+#### FE-T102 [x] [P] DueDateBadge (구 OverdueBadge)
+- **파일**: `src/client/components/DueDateBadge.tsx`, 테스트: `__tests__/components/DueDateBadge.test.tsx`
+- **Props**: `{ dueDate: string; isOverdue?: boolean }`
+- **의존성**: 없음
+- **변경 사항**: 당초 계획한 "isOverdue일 때만 조건부 렌더되는 경고 전용 뱃지(OverdueBadge)" 대신, 종료예정일 자체를 항상 표시하고 `isOverdue` 여부에 따라 색상만 바뀌는 `DueDateBadge`로 구현(와이어프레임의 "완료표기일" 뱃지가 모든 카드에 상시 노출되는 것과 일치). `TicketCard`에서 `isOverdue` 값을 그대로 넘겨주면 됨 — 표시 여부 자체를 부모가 조건부로 감싸는 대신 색상만 위임.
+- **완료** (2026-09-25) — 3개 테스트(값 표시, overdue 경고색, 기본 중립색) 전부 통과.
 
-#### FE-T103 [P] ConfirmDialog
-- **파일**: `src/client/components/ConfirmDialog.tsx`
+#### FE-T103 [x] [P] ConfirmDialog
+- **파일**: `src/client/components/ConfirmDialog.tsx`, 테스트: `__tests__/components/ConfirmDialog.test.tsx`
 - **Props**: `ConfirmDialogProps` (COMPONENT_SPEC.md 5.3)
-- **의존성**: 없음 (범용 다이얼로그, 티켓 타입 몰라도 됨)
-- **TDD 체크리스트**:
-  - [ ] Red: `TC-COMP-006-01`(삭제 버튼 → 다이얼로그 오픈은 TicketModal 쪽 테스트이므로, ConfirmDialog 자체는 `isOpen=false`일 때 미렌더 / `isOpen=true`일 때 `title`,`message` 표시 테스트를 신규 작성), `TC-COMP-006-02`("취소" 클릭 → `onCancel` 1회, `onConfirm` 미호출), `TC-COMP-006-03`("확인" 클릭 → `onConfirm` 1회)
-  - [ ] Green: `role="dialog"`, `aria-modal="true"` 포함 최소 구현
-  - [ ] Refactor: 포커스 트랩 로직 정리 (TicketModal과 공유 가능하면 훅으로 분리 고려 — 단, MVP 범위 밖이면 보류)
+- **의존성**: `FE-T104`(Modal), `FE-T100`(Button) — 범용 `Modal` 위에 합성하는 구조로 구현(포커스 트랩/ESC/오버레이 클릭 로직을 중복 작성하지 않기 위해)
+- **완료** (2026-09-25) — 5개 테스트(미렌더, title/message 표시, 확인→onConfirm, 취소→onCancel, ESC→onCancel) 전부 통과.
+
+#### FE-T104 [x] [P] Modal (신규 — 원래 계획에 없던 범용 다이얼로그 프리미티브)
+- **파일**: `src/client/components/Modal.tsx`, 테스트: `__tests__/components/Modal.test.tsx`
+- **Props**: `{ isOpen, onClose, children }`
+- **의존성**: 없음
+- **배경**: `ConfirmDialog`와 이후 `TicketModal`이 동일한 `role="dialog"`/`aria-modal`/ESC 닫기/오버레이 클릭 닫기 규칙을 공유하므로(COMPONENT_SPEC.md 5.1, 5.3), 이 규칙을 담은 범용 `Modal`을 먼저 만들고 `ConfirmDialog`가 그 위에 조합하는 구조로 변경. `FE-T502 TicketModal`도 이 위에서 만들 예정(Phase 5에서 반영).
+- **완료** (2026-09-25) — 5개 테스트(isOpen 여부, ESC 닫기, 오버레이 클릭 닫기, 컨텐츠 클릭 무시, role=dialog) 전부 통과.
 
 ---
 
@@ -118,14 +121,14 @@ graph TD
 
 ### Phase 3 — 티켓 카드 조합 컴포넌트
 
-Phase 1의 `PriorityBadge`, `OverdueBadge` 완료 후 시작.
+Phase 1의 `PriorityBadge`, `DueDateBadge` 완료 후 시작.
 
 #### FE-T301 TicketCard
 - **파일**: `src/client/components/TicketCard.tsx`
-- **의존성**: `FE-T101`(PriorityBadge), `FE-T102`(OverdueBadge)
+- **의존성**: `FE-T101`(PriorityBadge), `FE-T102`(DueDateBadge)
 - **TDD 체크리스트**:
-  - [ ] Red: `TC-COMP-001-01`(오버듀 뱃지 표시), `TC-COMP-001-02`(정상 티켓 미표시), `TC-COMP-001-03`(오버듀 표시가 우선순위 뱃지와 다른 클래스/속성)
-  - [ ] Green: `ticket.isOverdue` 조건부 렌더 + `PriorityBadge` 배치, `role="button"`/`tabIndex={0}`/`aria-label` 포함 최소 구현
+  - [ ] Red: `TC-COMP-001-01`(오버듀 표시), `TC-COMP-001-02`(정상 티켓은 경고색 미적용), `TC-COMP-001-03`(오버듀 표시가 우선순위 뱃지와 다른 클래스/속성) — `DueDateBadge`로 구현이 바뀌었으므로 "렌더 여부" 대신 "색상 클래스 적용 여부"로 검증
+  - [ ] Green: `dueDate`가 있을 때만 `DueDateBadge`에 `isOverdue` 전달 + `PriorityBadge` 배치, `role="button"`/`tabIndex={0}`/`aria-label` 포함 최소 구현
   - [ ] Refactor: 제목 truncate, 일정 요약 표시 로직(둘 다 null이면 미표시) 정리 — 테스트 유지
   - [ ] (드래그 가능 요소 등록은 `@dnd-kit`의 `useSortable`을 쓰지만, 실제 드래그 동작 검증은 Phase 6의 `TC-INT-001`에서 통합 테스트로 수행 — 이 Phase에서는 정적 렌더링만 검증)
 
@@ -214,10 +217,12 @@ Phase 4, Phase 5 전부 완료 후 시작. 이 프로젝트에서 유일하게 �
 
 ## 3. 전체 순서 요약 (체크박스)
 
-- [ ] FE-T000 `src/shared/types/index.ts` 타입 보강 (블로킹, 최우선)
-- [ ] FE-T101 [P] PriorityBadge
-- [ ] FE-T102 [P] OverdueBadge
-- [ ] FE-T103 [P] ConfirmDialog
+- [x] FE-T000 `src/shared/types/index.ts` 타입 보강 (블로킹, 최우선)
+- [x] FE-T100 [P] Button
+- [x] FE-T101 [P] PriorityBadge
+- [x] FE-T102 [P] DueDateBadge (구 OverdueBadge)
+- [x] FE-T104 [P] Modal (신규 추가)
+- [x] FE-T103 [P] ConfirmDialog (FE-T104, FE-T100 이후)
 - [ ] FE-T201 [P] ticketApi.ts
 - [ ] FE-T202 [P] useTicketForm
 - [ ] FE-T301 TicketCard (FE-T101, FE-T102 이후)

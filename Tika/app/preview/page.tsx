@@ -10,6 +10,91 @@
  * 각 Phase의 컴포넌트가 완성되면 해당 섹션에 import + 목 데이터를 채워 넣는다.
  */
 
+import { useState } from 'react';
+import { Button } from '@/client/components/Button';
+import { PriorityBadge } from '@/client/components/PriorityBadge';
+import { DueDateBadge } from '@/client/components/DueDateBadge';
+import { Modal } from '@/client/components/Modal';
+import { ConfirmDialog } from '@/client/components/ConfirmDialog';
+
+function Phase1Section() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
+  return (
+    <section aria-labelledby="phase-1-heading" className="rounded-panel border border-border bg-surface p-6">
+      <h2 id="phase-1-heading" className="text-lg font-semibold text-text">
+        Phase 1 — 말단 컴포넌트
+      </h2>
+
+      <div className="mt-4 flex flex-col gap-6">
+        <div>
+          <h3 className="text-sm font-semibold text-text-muted">Button (FE-T100)</h3>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button variant="primary">Primary</Button>
+            <Button variant="secondary">Secondary</Button>
+            <Button variant="danger">Danger</Button>
+            <Button variant="ghost">Ghost</Button>
+            <Button size="sm">Small</Button>
+            <Button size="lg">Large</Button>
+            <Button isLoading>저장</Button>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-text-muted">PriorityBadge (FE-T101)</h3>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <PriorityBadge priority="LOW" />
+            <PriorityBadge priority="MEDIUM" />
+            <PriorityBadge priority="HIGH" />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-text-muted">DueDateBadge (FE-T102)</h3>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <DueDateBadge dueDate="2026-10-01" />
+            <DueDateBadge dueDate="2026-09-01" isOverdue />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-text-muted">Modal (FE-T104)</h3>
+          <div className="mt-2">
+            <Button variant="secondary" onClick={() => setIsModalOpen(true)}>
+              Modal 열기
+            </Button>
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+              <p className="text-text">범용 Modal 프리미티브 프리뷰입니다.</p>
+              <div className="mt-4 flex justify-end">
+                <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
+                  닫기
+                </Button>
+              </div>
+            </Modal>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-text-muted">ConfirmDialog (FE-T103)</h3>
+          <div className="mt-2">
+            <Button variant="danger" onClick={() => setIsConfirmOpen(true)}>
+              삭제 확인 다이얼로그 열기
+            </Button>
+            <ConfirmDialog
+              isOpen={isConfirmOpen}
+              title="티켓 삭제"
+              message="정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+              onConfirm={() => setIsConfirmOpen(false)}
+              onCancel={() => setIsConfirmOpen(false)}
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function PreviewSection({
   phaseId,
   title,
@@ -42,11 +127,7 @@ export default function PreviewPage() {
       </p>
 
       <div className="mt-8 flex flex-col gap-6">
-        <PreviewSection
-          phaseId="phase-1"
-          title="Phase 1 — 말단 컴포넌트"
-          todo="FE-T101 PriorityBadge, FE-T102 OverdueBadge, FE-T103 ConfirmDialog"
-        />
+        <Phase1Section />
         <PreviewSection phaseId="phase-3" title="Phase 3 — TicketCard" todo="FE-T301 TicketCard" />
         <PreviewSection
           phaseId="phase-4"
