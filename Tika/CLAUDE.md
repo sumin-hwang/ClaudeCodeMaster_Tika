@@ -143,4 +143,5 @@ Tika는 **두 계층의 명세**를 함께 쓴다.
 
 `/changelog` 스킬로 기록됨. 자세한 내용은 `CHANGE_LOG.md` 참고. 14일 지난 항목은 자동 제거됨.
 
+- 2026-09-25 [main] 프론트엔드 Phase 1~4 구현 완료(Button/Badge/Modal/ConfirmDialog/TicketCard/ColumnHeader/Column/Board), ticketApi.ts·useTicketForm 구현, 컴포넌트 프리뷰 페이지(`/preview`) 구축, 111개 테스트 전부 통과 (자세히: CHANGE_LOG.md)
 - 2026-09-24 [main] 나머지 6개 API 엔드포인트(GET 보드/상세, PATCH 수정/완료/재정렬, DELETE) 구현 완료, seed.ts cwd 버그 및 timestamp 타임존 버그 수정, TC-API-002~008 통합 테스트 45개 전부 통과 (자세히: CHANGE_LOG.md)
