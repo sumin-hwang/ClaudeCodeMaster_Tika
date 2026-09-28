@@ -43,6 +43,9 @@ graph TD
 
   useTicketForm --> TicketForm
   TicketForm --> TicketModal
+  TicketDetailView --> TicketModal
+  Modal --> TicketModal
+  ConfirmDialog --> TicketModal
 
   Board --> BoardPage
   TicketModal --> BoardPage
@@ -157,21 +160,25 @@ Phase 3의 `TicketCard` 완료 후 시작.
 
 `TicketForm`/`TicketModal`은 `useTicketForm`(Phase 2)에 의존, `useBoardData`/`useDragAndDrop`은 `ticketApi.ts`(Phase 2)에 의존. 이 Phase 안에서는 두 트랙이 서로 독립이라 병렬 가능.
 
-#### FE-T501 [P] TicketForm
-- **파일**: `src/client/components/TicketForm.tsx`
-- **의존성**: `FE-T202`(useTicketForm)
-- **TDD 체크리스트**:
-  - [ ] Red: `TC-COMP-004-01`(빈 폼+"생성" 버튼), `TC-COMP-004-02`(제목만 입력 후 제출), `TC-COMP-004-03`(우선순위 기본값 처리 방식 확정), `TC-COMP-004-04`(과거 종료예정일 차단+에러메시지), `TC-COMP-004-06`(제목 공백 차단+에러메시지)
-  - [ ] Green: 5개 테스트 통과 최소 구현 (필드: title/description/priority/plannedStartDate/dueDate)
-  - [ ] Refactor: 에러 메시지 표시 위치를 필드 하단으로 일관되게 정리
+#### FE-T501 [x] [P] TicketForm
+- **파일**: `src/client/components/TicketForm.tsx`, 테스트: `__tests__/components/TicketForm.test.tsx`
+- **의존성**: `FE-T202`(useTicketForm), `FE-T100`(Button)
+- **완료** (2026-09-28) — 자체 정의한 C004-1~7 7개 테스트 전부 통과: 생성 모드 기본값(MEDIUM), 수정 모드 `initialValues` 반영, 제목 공백 에러, 과거 종료예정일 에러, 시작예정일 date input, 유효 제출 시 `onSubmit` 호출, 제출 중 버튼 비활성화. `useTicketForm`(내부적으로 `createTicketSchema` 사용)을 그대로 사용해 실제 검증 로직까지 함께 통과시킴(mock 없음).
+- **부수 변경**: `Button.tsx`에 `type?: 'button' | 'submit'` prop 추가(기본값 `'button'`, 기존 동작 유지) — 폼 제출 버튼으로 재사용하기 위해 필요했음. 기존 12개 Button 테스트 영향 없음 확인.
 
-#### FE-T502 [P] TicketModal
-- **파일**: `src/client/components/TicketModal.tsx`
-- **의존성**: `FE-T501`(TicketForm)
-- **TDD 체크리스트**:
-  - [ ] Red: `TC-COMP-004-05`(제출 성공 시 `onClose` 1회), `TC-COMP-005-01`(edit 모드 진입 시 기존 값으로 폼 채움), `TC-COMP-005-02`(필드 수정 후 `onSubmit`에 변경분 포함), `TC-COMP-006-01`(edit 모드에서 "삭제" 버튼 클릭 → `onDelete` 1회, `ConfirmDialog`를 직접 열지 않음에 주의)
-  - [ ] Green: `mode`에 따른 조건부 렌더(빈 폼 vs `ticket` 초기값, 삭제 버튼 노출 여부) 최소 구현, `role="dialog"`/`aria-modal`/`Esc` 닫기 포함
-  - [ ] Refactor: 포커스 이동(열릴 때 제목 필드, 닫힐 때 트리거로 복귀) 정리
+#### FE-T503a [x] TicketDetailView (신규 — status/startedAt/completedAt/createdAt 읽기 전용 표시)
+- **파일**: `src/client/components/TicketDetailView.tsx`, 테스트: `__tests__/components/TicketDetailView.test.tsx`
+- **Props**: `{ ticket: Ticket }`
+- **의존성**: 없음
+- **배경**: `TicketForm`은 title/description/priority/plannedStartDate/dueDate만 다루고 `status`/`startedAt`/`completedAt`/`createdAt`은 `PATCH /api/tickets/:id`로 수정 불가한 시스템 필드(API_SPEC.md 4장)라, 이 값들만 읽기 전용으로 보여주는 별도 뷰로 분리.
+- **완료** (2026-09-28) — 3개 테스트(값 표시, null 필드 "-" 표시, 입력 가능한 폼 요소 없음) 전부 통과.
+
+#### FE-T502 [x] [P] TicketModal
+- **파일**: `src/client/components/TicketModal.tsx`, 테스트: `__tests__/components/TicketModal.test.tsx`
+- **의존성**: `FE-T501`(TicketForm), `FE-T503a`(TicketDetailView), `FE-T104`(Modal), `FE-T103`(ConfirmDialog)
+- **변경 사항 (2026-09-28)**: 원래 메모("모달을 직접 닫지 않고 ConfirmDialog를 여는 책임은 BoardPage에 위임")를 뒤집고, 삭제 확인을 `TicketModal`이 직접 소유하도록 변경 — 사용자가 명시적으로 요청한 2단계 확인 플로우: "삭제" 버튼 클릭(1단계) → 내부 `isConfirmOpen` 상태로 `ConfirmDialog` 오픈(이 시점 `onDelete` 미호출) → "확인" 클릭(2단계) → `onDelete()` 호출 후 `onClose()`. `BoardPage`는 더 이상 `confirmDeleteId` 상태를 가질 필요 없음(FE-T601 설계에 반영 필요).
+- **완료** (2026-09-28) — 7개 테스트: 생성 모드에 삭제 버튼/상세뷰 없음, `TC-COMP-004-05`(제출 성공 시 `onClose` 1회), `TC-COMP-005-01`(edit 모드 초기값+상세뷰 표시), `TC-COMP-005-02`(수정 후 제출), 삭제 1단계(ConfirmDialog 오픈, `onDelete` 미호출), 삭제 취소(계속 열림), 삭제 2단계 확인(`onDelete`+`onClose` 각 1회) 전부 통과.
+- **타입 노트**: `TicketForm`의 `initialValues`는 `Partial<CreateTicketInput>`(날짜/설명이 `string | undefined`)인데 `Ticket`은 `string | null`이라 그대로 전달하면 타입 에러 — `TicketModal` 내부에서 `null → undefined` 변환 어댑터를 둠.
 
 #### FE-T503 [P] useBoardData
 - **파일**: `src/client/hooks/useBoardData.ts`
@@ -200,7 +207,7 @@ Phase 4, Phase 5 전부 완료 후 시작. 이 프로젝트에서 유일하게 �
 - **의존성**: `FE-T402`(Board), `FE-T502`(TicketModal), `FE-T103`(ConfirmDialog), `FE-T503`(useBoardData), `FE-T504`(useDragAndDrop)
 - **TDD 체크리스트**:
   - [ ] Red: `TC-INT-001`(드래그앤드롭 → 완료 처리, US-005/US-006), `TC-INT-002`(완료 처리 → 삭제, US-006/US-008), `TC-COMP-005-03`(수정 성공 후 보드에 반영)
-  - [ ] Green: 3개 테스트 통과 최소 구현 — `activeModal`/`confirmDeleteId` 로컬 상태, 하위 컴포넌트에 핸들러 배선
+  - [ ] Green: 3개 테스트 통과 최소 구현 — `activeModal` 로컬 상태만 필요(`confirmDeleteId`는 `TicketModal`이 내부적으로 소유하게 됨, FE-T502 변경 사항 참고), 하위 컴포넌트에 핸들러 배선
   - [ ] Refactor: 반응형 레이아웃(NFR-002, COMPONENT_SPEC.md 7장 — 모바일 스크롤스냅/태블릿 2칼럼/데스크톱 `sidebar+3컬럼`)을 Tailwind 클래스로 정리, `globals.css`의 `--sidebar-width`/`--column-min-width` 토큰 사용
 
 #### FE-T602 app/page.tsx
@@ -226,8 +233,9 @@ Phase 4, Phase 5 전부 완료 후 시작. 이 프로젝트에서 유일하게 �
 - [x] FE-T401a ColumnHeader (신규 분리)
 - [x] FE-T401 Column (구 BoardColumn, BACKLOG 포함으로 범위 확장, FE-T301/FE-T401a 이후)
 - [x] FE-T402 Board (신규, BacklogSidebar 흡수, FE-T401 이후)
-- [ ] FE-T501 [P] TicketForm (FE-T202 이후)
-- [ ] FE-T502 [P] TicketModal (FE-T501 이후)
+- [x] FE-T501 [P] TicketForm (FE-T202 이후)
+- [x] FE-T503a TicketDetailView (신규)
+- [x] FE-T502 [P] TicketModal (FE-T501, FE-T503a 이후)
 - [ ] FE-T503 [P] useBoardData (FE-T201 이후)
 - [ ] FE-T504 useDragAndDrop (FE-T503 이후)
 - [ ] FE-T601 BoardPage (FE-T401, FE-T402, FE-T502, FE-T103, FE-T503, FE-T504 전부 이후)

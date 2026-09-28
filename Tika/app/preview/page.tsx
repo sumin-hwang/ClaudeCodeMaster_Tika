@@ -20,7 +20,9 @@ import { Modal } from '@/client/components/Modal';
 import { ConfirmDialog } from '@/client/components/ConfirmDialog';
 import { TicketCard } from '@/client/components/TicketCard';
 import { Board } from '@/client/components/Board';
-import type { BoardData, TicketWithMeta } from '@/shared/types';
+import { TicketForm } from '@/client/components/TicketForm';
+import { TicketModal } from '@/client/components/TicketModal';
+import type { BoardData, CreateTicketInput, Ticket, TicketWithMeta, UpdateTicketInput } from '@/shared/types';
 
 const MOCK_TICKETS: TicketWithMeta[] = [
   {
@@ -139,19 +141,58 @@ const MOCK_BOARD: BoardData['board'] = {
 };
 
 function Phase4Section() {
-  const [lastClicked, setLastClicked] = useState<string | null>(null);
+  const [lastAction, setLastAction] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<TicketWithMeta | null>(null);
+
+  const handleCardClick = (ticket: TicketWithMeta) => {
+    setLastAction(`카드 클릭: ${ticket.title}`);
+    setSelectedTicket(ticket);
+  };
+
+  const handleModalSubmit = async (data: CreateTicketInput | UpdateTicketInput) => {
+    setLastAction(`제출: ${JSON.stringify(data)}`);
+  };
+
+  const handleDelete = async () => {
+    setLastAction(`삭제 확정: ${selectedTicket?.title}`);
+    setSelectedTicket(null);
+  };
 
   return (
     <section aria-labelledby="phase-4-heading" className="rounded-panel border border-border bg-surface p-6">
       <h2 id="phase-4-heading" className="text-lg font-semibold text-text">
         Phase 4 — ColumnHeader / Column / Board
       </h2>
-      {lastClicked && <p className="mt-1 text-xs text-text-muted">마지막 클릭: {lastClicked}</p>}
+      {lastAction && <p className="mt-1 break-all text-xs text-text-muted">{lastAction}</p>}
+
+      <div className="mt-4">
+        <Button onClick={() => setIsCreateModalOpen(true)}>티켓생성</Button>
+      </div>
+
       <div className="mt-4">
         <DndContext>
-          <Board board={MOCK_BOARD} onCardClick={(t) => setLastClicked(t.title)} />
+          <Board board={MOCK_BOARD} onCardClick={handleCardClick} />
         </DndContext>
       </div>
+
+      <TicketModal
+        mode="create"
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleModalSubmit}
+      />
+
+      {selectedTicket && (
+        <TicketModal
+          mode="edit"
+          ticket={selectedTicket}
+          isOpen
+          onClose={() => setSelectedTicket(null)}
+          onSubmit={handleModalSubmit}
+          onDelete={handleDelete}
+        />
+      )}
     </section>
   );
 }
@@ -234,6 +275,95 @@ function Phase1Section() {
   );
 }
 
+const MOCK_EDIT_TICKET: Ticket = {
+  id: 201,
+  title: '기존 티켓 제목',
+  description: '기존 설명',
+  status: 'IN_PROGRESS',
+  priority: 'HIGH',
+  position: 0,
+  plannedStartDate: null,
+  dueDate: '2026-10-10',
+  startedAt: '2026-09-20T00:00:00.000Z',
+  completedAt: null,
+  createdAt: '2026-09-01T00:00:00.000Z',
+  updatedAt: '2026-09-20T00:00:00.000Z',
+};
+
+function Phase5Section() {
+  const [submitted, setSubmitted] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [lastAction, setLastAction] = useState<string | null>(null);
+
+  const handleSubmit = async (data: CreateTicketInput) => {
+    setSubmitted(JSON.stringify(data));
+  };
+
+  const handleModalSubmit = async (data: CreateTicketInput | UpdateTicketInput) => {
+    setLastAction(`제출: ${JSON.stringify(data)}`);
+  };
+
+  const handleDelete = async () => {
+    setLastAction('삭제 확정됨 (onDelete 호출)');
+  };
+
+  return (
+    <section aria-labelledby="phase-5-heading" className="rounded-panel border border-border bg-surface p-6">
+      <h2 id="phase-5-heading" className="text-lg font-semibold text-text">
+        Phase 5 — TicketForm
+      </h2>
+      {submitted && <p className="mt-1 break-all text-xs text-text-muted">마지막 제출: {submitted}</p>}
+      <div className="mt-4 grid gap-6 md:grid-cols-2">
+        <div>
+          <h3 className="text-sm font-semibold text-text-muted">생성 모드 (FE-T501)</h3>
+          <div className="mt-2">
+            <TicketForm onSubmit={handleSubmit} submitLabel="생성" />
+          </div>
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-text-muted">수정 모드 (FE-T501)</h3>
+          <div className="mt-2">
+            <TicketForm
+              initialValues={{ title: '기존 티켓 제목', priority: 'HIGH', dueDate: '2026-10-10' }}
+              onSubmit={handleSubmit}
+              submitLabel="수정"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 border-t border-border pt-4">
+        <h3 className="text-sm font-semibold text-text-muted">TicketModal (FE-T502)</h3>
+        {lastAction && <p className="mt-1 break-all text-xs text-text-muted">{lastAction}</p>}
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setIsCreateModalOpen(true)}>
+            생성 모달 열기
+          </Button>
+          <Button variant="secondary" onClick={() => setIsEditModalOpen(true)}>
+            수정 모달 열기 (삭제 2단계 확인 포함)
+          </Button>
+        </div>
+
+        <TicketModal
+          mode="create"
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          onSubmit={handleModalSubmit}
+        />
+        <TicketModal
+          mode="edit"
+          ticket={MOCK_EDIT_TICKET}
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          onSubmit={handleModalSubmit}
+          onDelete={handleDelete}
+        />
+      </div>
+    </section>
+  );
+}
+
 function PreviewSection({
   phaseId,
   title,
@@ -269,11 +399,7 @@ export default function PreviewPage() {
         <Phase1Section />
         <Phase3Section />
         <Phase4Section />
-        <PreviewSection
-          phaseId="phase-5"
-          title="Phase 5 — 폼/모달"
-          todo="FE-T501 TicketForm, FE-T502 TicketModal"
-        />
+        <Phase5Section />
         <PreviewSection phaseId="phase-6" title="Phase 6 — BoardPage" todo="FE-T601 BoardPage" />
       </div>
     </main>

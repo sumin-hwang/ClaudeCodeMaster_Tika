@@ -29,7 +29,7 @@ export const Modal = ({ isOpen, onClose, children }: ModalProps) => {
       <div
         role="dialog"
         aria-modal="true"
-        className="rounded-panel bg-surface p-6 shadow-card-hover"
+        className="w-full max-w-md mx-4 rounded-panel bg-surface p-6 shadow-card-hover"
         onClick={(e) => e.stopPropagation()}
       >
         {children}

@@ -1,4 +1,5 @@
 interface ButtonProps {
+  type?: 'button' | 'submit';
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
@@ -20,6 +21,7 @@ const SIZE_CLASS: Record<NonNullable<ButtonProps['size']>, string> = {
 };
 
 export const Button = ({
+  type = 'button',
   variant = 'primary',
   size = 'md',
   isLoading = false,
@@ -28,7 +30,7 @@ export const Button = ({
 }: ButtonProps) => {
   return (
     <button
-      type="button"
+      type={type}
       disabled={isLoading}
       onClick={onClick}
       className={`rounded-card font-medium disabled:cursor-not-allowed disabled:opacity-60 ${VARIANT_CLASS[variant]} ${SIZE_CLASS[size]}`}
