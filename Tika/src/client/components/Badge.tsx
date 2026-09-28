@@ -4,7 +4,7 @@ interface PriorityBadgeProps {
   priority: TicketPriority;
 }
 
-const PRIORITY_LABEL: Record<TicketPriority, string> = {
+export const PRIORITY_LABEL: Record<TicketPriority, string> = {
   LOW: '낮음',
   MEDIUM: '보통',
   HIGH: '높음',

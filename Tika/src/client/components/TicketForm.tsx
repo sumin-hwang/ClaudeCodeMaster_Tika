@@ -1,5 +1,6 @@
 import { useTicketForm } from '@/client/hooks/useTicketForm';
 import { Button } from '@/client/components/Button';
+import { PRIORITY_LABEL } from '@/client/components/Badge';
 import type { CreateTicketInput } from '@/shared/types';
 
 interface TicketFormProps {
@@ -57,7 +58,7 @@ export const TicketForm = ({ initialValues, onSubmit, submitLabel }: TicketFormP
         >
           {PRIORITY_OPTIONS.map((option) => (
             <option key={option} value={option}>
-              {option}
+              {PRIORITY_LABEL[option]}
             </option>
           ))}
         </select>

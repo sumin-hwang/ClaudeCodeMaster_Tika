@@ -57,6 +57,12 @@ export const TicketModal = ({ mode, ticket, isOpen, onClose, onSubmit, onDelete 
         />
       </div>
 
+      <div className="mt-2">
+        <Button variant="secondary" onClick={onClose}>
+          닫기
+        </Button>
+      </div>
+
       {mode === 'edit' && (
         <div className="mt-4">
           <Button variant="danger" onClick={() => setIsConfirmOpen(true)}>
