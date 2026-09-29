@@ -31,8 +31,8 @@ graph TD
   Modal --> ConfirmDialog
   Button --> ConfirmDialog
 
-  api --> useBoardData
-  useBoardData --> useDragAndDrop
+  api --> useTickets
+  useTickets --> useDragAndDrop
 
   PriorityBadge --> TicketCard
   DueDateBadge --> TicketCard
@@ -47,13 +47,13 @@ graph TD
   Modal --> TicketModal
   ConfirmDialog --> TicketModal
 
-  Board --> BoardPage
-  TicketModal --> BoardPage
-  ConfirmDialog --> BoardPage
-  useBoardData --> BoardPage
-  useDragAndDrop --> BoardPage
+  Board --> BoardContainer
+  TicketModal --> BoardContainer
+  BoardHeader --> BoardContainer
+  useTickets --> BoardContainer
+  useDragAndDrop --> BoardContainer
 
-  BoardPage --> page["app/page.tsx"]
+  BoardContainer --> page["app/page.tsx"]
 ```
 
 읽는 법: 화살표는 "이게 있어야 저걸 만들 수 있다"는 뜻이다. `PriorityBadge`와 `OverdueBadge`는 서로 의존하지 않으므로 동시에 만들어도 되고, `ticketApi.ts`/`useTicketForm` 트랙과 `PriorityBadge`/`OverdueBadge`/`ConfirmDialog` 트랙도 서로 독립이라 병렬 가능하다. 모든 화살표가 `BoardPage`로 모이는 것이 이 컴포넌트 트리의 특징이다(COMPONENT_SPEC.md 1장과 동일 구조, 화살표만 반대 방향).
@@ -104,9 +104,9 @@ graph TD
 #### FE-T201 [x] [P] ticketApi.ts
 - **파일**: `src/client/api/ticketApi.ts`, 테스트: `__tests__/client/api/ticketApi.test.ts`
 - **의존성**: `FE-T000`(타입)
-- **역할**: `API_SPEC.md`의 7개 엔드포인트를 얇게 감싼 `fetch` 래퍼 함수 7개 (`getBoard`, `getTicket`, `createTicket`, `updateTicket`, `completeTicket`, `deleteTicket`, `reorderTicket`). 컴포넌트/훅은 이 모듈을 통해서만 API 호출(CLAUDE.md 컨벤션).
-- **완료** (2026-09-25) — 9개 테스트(7개 함수의 method/URL/body 검증, 에러 응답 시 `error` 객체 그대로 throw, 공통 Content-Type 헤더) 전부 통과. 공통 `request<T>()` 헬퍼로 처음부터 중복 없이 구현돼 별도 Refactor 불필요. 부수적으로 `src/shared/types/index.ts`에 누락돼 있던 `ReorderTicketInput` 재노출 추가.
-- 테스트 위치는 기존 `__tests__/api/`(서버 라우트, 실DB 연동)와 구분하기 위해 `__tests__/client/api/`로 새로 분리(`src/client/` 미러링).
+- **역할**: `API_SPEC.md`의 엔드포인트를 얇게 감싼 `fetch` 래퍼 함수. `getBoard`, `getTicket`, `create`, `update`, `complete`, `remove`, `reorder` — 컴포넌트/훅은 이 모듈을 통해서만 API 호출(CLAUDE.md 컨벤션).
+- **완료** (2026-09-25, **2026-09-29 함수명 리네임 + 에러 계약 변경**) — 애초 `createTicket`/`updateTicket`/`deleteTicket`/`reorderTicket`/`completeTicket`이었던 이름을 `create`/`update`/`remove`/`reorder`/`complete`로 리네임(사용자 요청). `getTicket`은 이번 테스트 범위엔 없지만 구현엔 그대로 남겨둠(다른 FR-003 소비처가 아직 없어 미검증 상태). 에러 처리도 `throw body.error`(객체 그대로)에서 `throw new Error(body.error.message)`로 변경 — 호출부에서 `.message`로 바로 접근 가능하도록. 리네임 시점에 실제 소비 코드가 전혀 없었음을 확인한 뒤 진행(안전한 변경). 12개 테스트(6개 함수 × 성공/에러 각 1개) 전부 통과. 공통 `request<T>()` 헬퍼 유지, 별도 Refactor 불필요.
+- 테스트 위치는 기존 `__tests__/api/`(서버 라우트, 실DB 연동)와 구분하기 위해 `__tests__/client/api/`로 분리(`src/client/` 미러링).
 
 #### FE-T202 [x] [P] useTicketForm
 - **파일**: `src/client/hooks/useTicketForm.ts`, 테스트: `__tests__/client/hooks/useTicketForm.test.ts`
@@ -180,21 +180,33 @@ Phase 3의 `TicketCard` 완료 후 시작.
 - **완료** (2026-09-28) — 7개 테스트: 생성 모드에 삭제 버튼/상세뷰 없음, `TC-COMP-004-05`(제출 성공 시 `onClose` 1회), `TC-COMP-005-01`(edit 모드 초기값+상세뷰 표시), `TC-COMP-005-02`(수정 후 제출), 삭제 1단계(ConfirmDialog 오픈, `onDelete` 미호출), 삭제 취소(계속 열림), 삭제 2단계 확인(`onDelete`+`onClose` 각 1회) 전부 통과.
 - **타입 노트**: `TicketForm`의 `initialValues`는 `Partial<CreateTicketInput>`(날짜/설명이 `string | undefined`)인데 `Ticket`은 `string | null`이라 그대로 전달하면 타입 에러 — `TicketModal` 내부에서 `null → undefined` 변환 어댑터를 둠.
 
-#### FE-T503 [P] useBoardData
-- **파일**: `src/client/hooks/useBoardData.ts`
+#### FE-T503 [x] [P] useTickets (구 useBoardData — 설계 단순화)
+- **파일**: `src/client/hooks/useTickets.ts`, 테스트: `__tests__/client/hooks/useTickets.test.ts`
 - **의존성**: `FE-T201`(ticketApi.ts)
-- **TDD 체크리스트**:
-  - [ ] Red: 전용 TC ID 없음(TEST_CASES.md는 `BoardPage` 통합 테스트로 간접 검증) — `ticketApi`를 `jest.mock`하여 아래를 신규 테스트로 작성(제안 `TC-COMP-009-0N`): 초기 로드 시 `GET /api/tickets` 결과로 `board` 세팅, `moveTicket` 호출 즉시 낙관적 업데이트, API 실패 시 직전 스냅샷으로 롤백 + `error` 설정
-  - [ ] Green: `UseBoardDataResult` 인터페이스(COMPONENT_SPEC.md 6.1) 그대로 최소 구현
-  - [ ] Refactor: `moveTicket`의 `targetStatus === 'DONE'` 분기(→ `completeTicket` API) vs 나머지(→ `reorderTicket` API) 로직을 명확히 분리
+- **변경 사항 (2026-09-29)**: COMPONENT_SPEC.md 6.1의 `UseBoardDataResult`(낙관적 업데이트 + 롤백, `moveTicket` 단일 진입점)를 사용자 요청에 따라 더 단순한 설계로 대체. `moveTicket` 없이 `ticketApi`의 `create`/`update`/`remove`/`reorder`/`complete`를 1:1로 그대로 노출하고, 각 호출은 **낙관적 업데이트가 아니라 "API 호출 → 성공 시 `getBoard()`로 보드 재조회(refetch)"** 패턴을 씀 — `targetStatus==='DONE'` 분기 로직 자체가 사라져 `useDragAndDrop`(FE-T504)이 `reorder`/`complete` 중 무엇을 호출할지 직접 판단해야 함.
+- **완료** (2026-09-29) — 10개 테스트: `initialData` 있음/없음 초기화, `create`/`update`/`remove`/`reorder`/`complete` 각각 "API 호출 → `getBoard`로 재조회" 확인, 실패 시 `error` 설정(+`getBoard` 미호출로 board 갱신 안 됨 확인), API 호출 중 `isLoading` true→false 전이, 이전 실패의 `error`가 다음 성공 호출에 남지 않고 초기화됨. 공통 `runMutation` 헬퍼로 5개 메서드 중복 없이 구현.
+- **반환**: `{ board, isLoading, error, create, update, remove, reorder, complete }` — `refetch`도 별도로 노출하지 않음(내부 `refreshBoard`만 사용).
+- **변경 사항 (2026-09-30, 2차)**: 사용자 요청으로 `reorder`/`complete`에 한해 COMPONENT_SPEC.md 6.1의 4단계 낙관적 업데이트(①호출 즉시 board 낙관적 갱신 ②API 호출 ③성공 시 서버 응답으로 재동기화 ④실패 시 스냅샷 롤백)를 재적용. `create`/`update`/`remove`는 범위 밖 — 기존 refetch 패턴 그대로 유지. `moveTicketOptimistically`(로컬 이동)/`applyReorderResult`(ticket+affected 재동기화)/`applyCompleteResult`/`withOverdue`(서버의 `isOverdue` 계산식을 그대로 복제 — `dueDate`가 있고 `status !== 'DONE'`이고 `dueDate < 오늘`) 헬퍼 추가. `ticketApi.reorder`/`complete`가 `Ticket`(원본, `isOverdue` 없음)을 반환하므로 `withOverdue()`로 `TicketWithMeta`로 복원 후 board에 반영. 기존 10개 중 reorder/complete 관련 2개를 낙관적 업데이트 검증으로 교체 + 롤백 테스트 2개 추가(총 12개), 나머지 8개는 변경 없음.
 
-#### FE-T504 useDragAndDrop
-- **파일**: `src/client/hooks/useDragAndDrop.ts`
-- **의존성**: `FE-T503`(useBoardData — `moveTicket` 시그니처 필요)
-- **TDD 체크리스트**:
-  - [ ] Red: 전용 TC ID 없음(`TC-INT-001`로 간접 검증) — `onDragEnd`가 드롭 대상 status/position을 계산해 `moveTicket`을 올바른 인자로 호출하는지 단위 테스트 신규 작성(제안 `TC-COMP-010-0N`)
-  - [ ] Green: `PointerSensor`/`TouchSensor`/`KeyboardSensor` 등록 + `onDragEnd` 최소 구현
-  - [ ] Refactor: position 추정 로직을 순수 함수로 분리해 테스트 용이성 확보
+#### FE-T504 [x] useDragAndDrop
+- **파일**: `src/client/hooks/useDragAndDrop.ts`, 테스트: `__tests__/client/hooks/useDragAndDrop.test.ts`
+- **의존성**: `FE-T503`(useTickets) — `moveTicket` 대신 `reorder`/`complete`를 직접 호출, 대상 status가 `'DONE'`이면 `complete`, 아니면 `reorder` 호출
+- **완료** (2026-09-30) — 순수 함수 `resolveDropTarget(board, activeId, over)`로 대상 `status`/`position`(컬럼 내 삽입 인덱스) 계산을 분리(`over.data.current?.status ?? over.id`로 대상 컬럼 판별). 6개 테스트(다른 컬럼 빈 영역 드롭→맨 뒤 위치로 `reorder`, 다른 컬럼 특정 카드 위 드롭→해당 인덱스로 `reorder`, 같은 컬럼 내 재정렬→`reorder`, DONE 드롭→`complete`(reorder 미호출), `over` 없음→둘 다 미호출, `sensors` 3개(Pointer/Touch/Keyboard) 등록) 전부 통과.
+- **부수 변경**: `Column.tsx`(`useDroppable`)와 `TicketCard.tsx`(`useSortable`)에 `data: { status }`를 추가해 `over.data.current?.status`로 드롭 대상 컬럼을 판별할 수 있게 함. 기존 `Column.test.tsx`의 `useDroppable` 호출 인자 검증 테스트를 이 변경에 맞춰 갱신.
+
+#### FE-T505 [x] [P] BoardHeader (신규 — 원래 계획에 없던 페이지 상단 헤더)
+- **파일**: `src/client/components/BoardHeader.tsx`, 테스트: `__tests__/components/BoardHeader.test.tsx`
+- **Props**: `{ onCreateClick: () => void }`
+- **의존성**: `FE-T100`(Button)
+- **배경**: `docs/COMPONENT_SPEC.md`/`TEST_CASES.md`에 없던 항목이나, 사용자가 채팅으로 4개 테스트를 직접 지정해 이 문서에 즉석 명세로 기록 후 구현. "Tika" 타이틀, "새 업무" 버튼(클릭 시 `onCreateClick`), 검색 input(이번 범위에서는 기능 없이 `disabled` 상태로만 존재 — 실제 검색 기능은 향후 별도 작업).
+- **완료** (2026-09-29) — 4개 테스트(제목 렌더, 버튼 렌더, 버튼 클릭→`onCreateClick`, 검색 input `disabled`) 전부 통과. 기존 `Button`(FE-T100)을 그대로 재사용, `form-input` 클래스(FE-T501에서 정의)를 검색 input에 재사용.
+
+#### FE-T506 [x] [P] FilterBar (신규 — 원래 계획에 없던 필터 바)
+- **파일**: `src/client/components/FilterBar.tsx`, 테스트: `__tests__/components/FilterBar.test.tsx`
+- **Props**: `{ weekCount: number; overdueCount: number; activeFilter: 'all' | 'week' | 'overdue'; onFilterChange: (filter) => void }`
+- **의존성**: 없음 (카운트 계산 로직 없이 props로 받은 값만 표시하는 순수 컴포넌트 — 실제 "이번주 업무"/"일정 초과" 카운트 계산은 이 컴포넌트의 범위 밖이며, 아직 저장소 어디에도 해당 계산 로직이 없음. 추후 `useTickets` 확장 또는 `BoardPage`에서 계산해 내려줄 예정)
+- **배경**: `BoardHeader`와 동일하게 사용자가 채팅으로 6개 테스트를 직접 지정해 즉석 명세로 기록.
+- **완료** (2026-09-29) — 6개 테스트(week/overdue 카운트 표시, 각 클릭→`onFilterChange('week'|'overdue')`, 활성 필터 재클릭→`onFilterChange('all')` 토글, `activeFilter` 일치 버튼만 `aria-pressed="true"`) 전부 통과. `Button` 컴포넌트 대신 `aria-pressed` 토글 상태가 필요해 직접 `<button>`으로 구현(Badge.tsx 관례처럼 클래스 맵 없이 조건부 클래스로 충분 — 옵션 2개뿐).
 
 ---
 
@@ -202,20 +214,18 @@ Phase 3의 `TicketCard` 완료 후 시작.
 
 Phase 4, Phase 5 전부 완료 후 시작. 이 프로젝트에서 유일하게 통합 테스트(`TC-INT-*`) 대상.
 
-#### FE-T601 BoardPage
-- **파일**: `src/client/components/BoardPage.tsx`
-- **의존성**: `FE-T402`(Board), `FE-T502`(TicketModal), `FE-T103`(ConfirmDialog), `FE-T503`(useBoardData), `FE-T504`(useDragAndDrop)
-- **TDD 체크리스트**:
-  - [ ] Red: `TC-INT-001`(드래그앤드롭 → 완료 처리, US-005/US-006), `TC-INT-002`(완료 처리 → 삭제, US-006/US-008), `TC-COMP-005-03`(수정 성공 후 보드에 반영)
-  - [ ] Green: 3개 테스트 통과 최소 구현 — `activeModal` 로컬 상태만 필요(`confirmDeleteId`는 `TicketModal`이 내부적으로 소유하게 됨, FE-T502 변경 사항 참고), 하위 컴포넌트에 핸들러 배선
-  - [ ] Refactor: 반응형 레이아웃(NFR-002, COMPONENT_SPEC.md 7장 — 모바일 스크롤스냅/태블릿 2칼럼/데스크톱 `sidebar+3컬럼`)을 Tailwind 클래스로 정리, `globals.css`의 `--sidebar-width`/`--column-min-width` 토큰 사용
+#### FE-T601 [x] BoardContainer (원래 계획명 `BoardPage`에서 사용자 지정으로 리네임)
+- **파일**: `src/client/components/BoardContainer.tsx`, 테스트: `__tests__/components/BoardContainer.test.tsx`
+- **Props**: `{ initialData: BoardData['board'] }` (원래 COMPONENT_SPEC.md 3.1은 "Props 없음"이었으나, `app/page.tsx`가 Server Component로 전환되면서 초기 데이터를 prop으로 주입받는 구조로 변경)
+- **의존성**: `FE-T402`(Board), `FE-T502`(TicketModal), `FE-T505`(BoardHeader), `FE-T503`(useTickets), `FE-T504`(useDragAndDrop)
+- **완료** (2026-09-30) — `useTickets(initialData)` + `useDragAndDrop({ board, reorder, complete })`을 사용해 `BoardHeader`("새 업무" → 생성 모달) + `Board`(카드 클릭 → 수정 모달) + `TicketModal`(생성/수정/삭제)을 `DndContext`로 감싸 배선. `activeModal: { mode: 'create' } | { mode: 'edit'; ticket } | null` 로컬 상태만 관리(삭제 확인은 `TicketModal`이 내부 소유, FE-T502 변경사항 그대로 유지). `useTickets`/`useDragAndDrop`은 mock 처리하고 배선만 검증하는 6개 테스트(초기 board 렌더, "새 업무"→생성 모달, 카드 클릭→수정 모달, 생성 제출→`create`+모달 닫힘, 수정 제출→`update`+모달 닫힘, 삭제 확인→`remove`+모달 닫힘) 전부 통과. 실제 드래그 로직(대상 컬럼/인덱스 계산, 낙관적 업데이트, 롤백)은 `useDragAndDrop`(FE-T504)/`useTickets`(FE-T503) 자체 단위 테스트에서 이미 검증됨 — `TC-INT-001`/`TC-INT-002`가 요구하는 시나리오를 이 두 계층으로 나누어 커버.
+- **범위 밖**: `FilterBar`(FE-T506) 연결(카운트 계산 로직 없음), 반응형 레이아웃(NFR-002) 세부 조정 — 이번 요청 범위 밖으로 남겨둠.
 
-#### FE-T602 app/page.tsx
+#### FE-T602 [x] app/page.tsx
 - **파일**: `app/page.tsx`
-- **의존성**: `FE-T601`(BoardPage)
-- **TDD 체크리스트**:
-  - [ ] Red/Green 생략 가능 — Server Component가 Client Component(`BoardPage`)를 렌더만 하는 1줄짜리 진입점이라 별도 테스트 케이스가 TEST_CASES.md에도 없음
-  - [ ] 대신 `npm run dev` 기동 후 브라우저에서 보드가 실제로 로드되는지 수동 확인 (요청하신 대로 다음 컴포넌트 작업이 끝난 뒤 `/run`으로 확인 권장)
+- **의존성**: `FE-T601`(BoardContainer)
+- **완료** (2026-09-30) — `async function Home()`에서 `ticketService.getBoard()`를 직접 호출(이미 `app/api/tickets/route.ts`의 GET 핸들러가 쓰는 것과 동일한 함수)하고, 결과를 `BoardContainer`의 `initialData` prop으로 전달. Red/Green 생략(기존 방침대로 별도 자동화 테스트 없음), `npx tsc --noEmit`으로 타입 검증.
+- **버그 수정**: `ticketService.getBoard()`가 반환하는 티켓은 DB 원본 타입이라 `createdAt`/`startedAt`/`completedAt`이 `Date` 객체다(`status`/`priority`도 리터럴 유니온이 아닌 `string`). API 라우트를 거치면 `NextResponse.json()`이 자동으로 ISO 문자열로 직렬화하지만, Server Component에서 서비스를 직접 호출하면 이 직렬화를 거치지 않아 `TicketDetailView`의 `value.slice(0,10)` 같은 문자열 전용 로직이 런타임에 깨질 수 있었다. `app/page.tsx`에 `serializeBoard`/`serializeTicket` 헬퍼를 추가해 `Date→toISOString()`, `status`/`priority`→리터럴 타입으로 명시적으로 변환한 뒤 `BoardContainer`에 전달하도록 수정.
 
 ---
 
@@ -236,10 +246,12 @@ Phase 4, Phase 5 전부 완료 후 시작. 이 프로젝트에서 유일하게 �
 - [x] FE-T501 [P] TicketForm (FE-T202 이후)
 - [x] FE-T503a TicketDetailView (신규)
 - [x] FE-T502 [P] TicketModal (FE-T501, FE-T503a 이후)
-- [ ] FE-T503 [P] useBoardData (FE-T201 이후)
-- [ ] FE-T504 useDragAndDrop (FE-T503 이후)
-- [ ] FE-T601 BoardPage (FE-T401, FE-T402, FE-T502, FE-T103, FE-T503, FE-T504 전부 이후)
-- [ ] FE-T602 app/page.tsx (FE-T601 이후)
+- [x] FE-T503 [P] useTickets (구 useBoardData, FE-T201 이후)
+- [x] FE-T504 useDragAndDrop (FE-T503 이후)
+- [x] FE-T505 [P] BoardHeader (신규, FE-T100 이후)
+- [x] FE-T506 [P] FilterBar (신규, 의존성 없음)
+- [x] FE-T601 BoardContainer (구 BoardPage, FE-T401, FE-T402, FE-T502, FE-T505, FE-T503, FE-T504 전부 이후)
+- [x] FE-T602 app/page.tsx (FE-T601 이후)
 
 ## 4. 참고: TEST_CASES.md에 없는 신규 제안 ID
 

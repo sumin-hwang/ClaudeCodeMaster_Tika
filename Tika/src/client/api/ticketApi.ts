@@ -7,11 +7,6 @@ import type {
   UpdateTicketInput,
 } from '@/shared/types';
 
-interface ApiErrorBody {
-  code: string;
-  message: string;
-}
-
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`/api${path}`, {
     method: 'GET',
@@ -26,7 +21,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const body = await response.json();
 
   if (!response.ok) {
-    throw body.error as ApiErrorBody;
+    throw new Error(body.error.message);
   }
 
   return body as T;
@@ -36,18 +31,18 @@ export const getBoard = () => request<BoardData>('/tickets');
 
 export const getTicket = (id: number) => request<TicketWithMeta>(`/tickets/${id}`);
 
-export const createTicket = (input: CreateTicketInput) =>
+export const create = (input: CreateTicketInput) =>
   request<Ticket>('/tickets', { method: 'POST', body: JSON.stringify(input) });
 
-export const updateTicket = (id: number, input: UpdateTicketInput) =>
+export const update = (id: number, input: UpdateTicketInput) =>
   request<TicketWithMeta>(`/tickets/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
 
-export const completeTicket = (id: number) =>
+export const complete = (id: number) =>
   request<Ticket>(`/tickets/${id}/complete`, { method: 'PATCH' });
 
-export const deleteTicket = (id: number) => request<void>(`/tickets/${id}`, { method: 'DELETE' });
+export const remove = (id: number) => request<void>(`/tickets/${id}`, { method: 'DELETE' });
 
-export const reorderTicket = (input: ReorderTicketInput) =>
+export const reorder = (input: ReorderTicketInput) =>
   request<{ ticket: Ticket; affected: { id: number; position: number }[] }>('/tickets/reorder', {
     method: 'PATCH',
     body: JSON.stringify(input),

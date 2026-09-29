@@ -12,7 +12,7 @@ interface ColumnProps {
 }
 
 export const Column = ({ status, title, tickets, onCardClick }: ColumnProps) => {
-  const { setNodeRef } = useDroppable({ id: status });
+  const { setNodeRef } = useDroppable({ id: status, data: { status } });
 
   return (
     <div

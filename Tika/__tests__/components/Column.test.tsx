@@ -116,6 +116,6 @@ describe('Column', () => {
   test('useDroppable이 status를 id로 호출되어 드롭 가능 영역으로 등록된다', () => {
     render(<Column status="TODO" title="TODO" tickets={[]} onCardClick={jest.fn()} />);
 
-    expect(useDroppable).toHaveBeenCalledWith({ id: 'TODO' });
+    expect(useDroppable).toHaveBeenCalledWith({ id: 'TODO', data: { status: 'TODO' } });
   });
 });

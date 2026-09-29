@@ -11,6 +11,7 @@ interface TicketCardProps {
 export const TicketCard = ({ ticket, onClick }: TicketCardProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: ticket.id,
+    data: { status: ticket.status },
   });
 
   const style = {
